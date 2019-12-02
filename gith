@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -e
+
+usage() {
+	echo "Usage: gith <TOP_COMMIT_ID> <BULK_NUMBER> <END_TAG> <GIT_COMMAND_ARGS...>"
+	exit 0
+}
+
+get_prev_id() {
+	id=$1
+	bulk=$2
+	git show $id~$bulk | head -1 | sed -E 's@^commit @@g'
+}
+
+is_matched() {
+    id=$1
+    bulk=$2
+    end_tag=$3
+    o=$(git l $id~$bulk..$id | rg "tag: $end_tag")
+    echo $o
+}
+
+if [[ ( $# -eq 0 ) || ( $1 = "-h" ) ]] ;then
+	usage
+fi
+
+id=$1
+bulk=$2
+end_tag=$3
+args=${@:4}
+while [[ 1 ]] ;do
+    if ! git sh $id~$bulk > /dev/null 2>&1 ;then
+        echo [!]commit is not found: $id~$bulk
+		exit 0
+    fi
+
+	echo "[+]$id~$bulk..$id"
+	git ${args[@]} $id~$bulk..$id
+
+    o=$(is_matched $id $bulk "$end_tag")
+    if [[ ! -z $o ]] ;then
+        echo "[+]end: arrived end_tag"
+        exit 0
+    fi
+
+	id=$(get_prev_id $id $bulk)
+done
